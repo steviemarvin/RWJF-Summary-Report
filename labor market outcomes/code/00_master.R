@@ -17,7 +17,7 @@ library(fastDummies) # create indicator variables
 
 
 ## load data here
-ddi <-  read_ipums_ddi(here("data/cps_00013.xml"))
+ddi <-  read_ipums_ddi(here("data/cps_00015.xml"))
 asec_raw_data <- read_ipums_micro(ddi, verbose = FALSE)
 names(asec_raw_data) <- tolower(names(asec_raw_data))
 

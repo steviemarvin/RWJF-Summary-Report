@@ -11,13 +11,15 @@ asec_clean <- asec_raw_data %>%
          pov100 = if_else(offtotval < offcutoff, 1, 0),
          pov50 = if_else(offtotval < (offcutoff / 2), 1, 0),
          # variable that indicates that respondent is either household head or spouse
+         adult = if_else(age >= 18, 1, 0),
          hh_head_sp = if_else(relate == 101 | relate == 201 | relate == 202 | relate == 203, 1, 0),
-         LGB = if_else(relate == 202 | relate == 1117, 1, 0),
+         LGB = if_else(relate == 203 | relate == 1117, 1, 0),
+         # identifying related adults in the family to replicate figure 2: https://www.urban.org/sites/default/files/publication/32976/411936-racial-and-ethnic-disparities-among-low-income-families.pdf
          # indicator variable for whether respondent is an adult related to the household head (includes spouses)
          related_adult = if_else(relate >= 301 & relate <= 1001 & age >= 18, 1, 0),
          # indicator variable for whether respondent is an adult not related to the household head (includes unmarried partner)
-         not_related_adult = if_else(relate >= 1113 & age >= 18, 1, 0),
-         # indicator variables for whether or not repondent has a child under 18 or under 6
+         unrelated_adult = if_else(relate >= 1113 & age >= 18, 1, 0),
+         # indicator variables for whether or not respondent has a child under 18 or under 6
          u18 = if_else(yngch < 18 | eldch < 18, 1, 0),
          u6 = if_else(yngch < 6 | eldch < 6, 1, 0),
          # race and ethnicity variable so that race and ethnicity are mutually exclusive, modeling race variable from epi microdata extracts
@@ -28,43 +30,33 @@ asec_clean <- asec_raw_data %>%
                              race == 816 | race == 818) & hispan == 0 ~ 2,
                           # hispanic = 3
                           hispan >= 1 & hispan <= 612 ~ 3,
-                          # AAPI = 4
-                          ((race >= 650 & race <= 652) | race == 809 | race == 803 | 
-                             race == 804) ~ 4,    
-                          # AIAN = 5
+                          # AIAN = 4
                           (race == 300 | race == 802 | race == 808 | race == 812 | 
                              race == 813 | race == 815 | race == 817 | race == 819) & 
-                             hispan == 0 ~ 5, 
+                            hispan == 0 ~ 4,    
+                          # AAPI = 5
+                          ((race >= 650 & race <= 652) | race == 809 | race == 803 | 
+                             race == 804) & hispan == 0 ~ 5, 
                           TRUE ~ NA),
-         wbhaa = labelled(wbhaa, c("white" = 1, "black" = 2, "hispanic" = 3, "AAPI" = 4, "AIAN" = 5)),
+         wbhaa = labelled(wbhaa, c("white" = 1, "black" = 2, "hispanic" = 3, "AIAN" = 4, "AAPI" = 5)),
          # foreign born indicator variable
-         foreign_born = ifelse(nativity == 5 & nativity != 0, 1, 0),
-         citistat = case_when(citizen <= 3 ~ "citizen",
-                              citizen == 4 ~ "naturalized",
-                              citizen == 5 ~ "not_citizen",
-                              TRUE ~ NA),
-         ## creating variables for family structure identification
-         # identifying related adults in the family to replicate figure 2: https://www.urban.org/sites/default/files/publication/32976/411936-racial-and-ethnic-disparities-among-low-income-families.pdf
-         adult = if_else(age >= 18, 1, 0),
+         foreign_born = case_when(nativity == 0 ~ NA,
+                                  nativity == 5 ~ 1,
+                                  TRUE ~ 0),
          # indicator variables of type of parent
-         single_parent = if_else(marst == 6 & yngch < 18, 1, 0), #marst = 6: never married/single
-         married_parent = if_else(marst == 1 & yngch < 18, 1, 0),  #marst = 1: married, spouse present
-         # labor force variable creation
-         # uhrsworkly = usual hours worked per week last year
-         uhrsworkly = na_if(uhrsworkly, 999),
-         unemp = if_else((empstat >= 20 & empstat <= 22) & age >= 18, 1, 0),
-         # 1 = not in labor force, restricting to adults
-         nilf = case_when(labforce == 1 & age >= 18 ~ 1,
-                          labforce == 2 & age >= 18 ~ 0,
-                          TRUE ~ NA),
-         emp = if_else((empstat > 0 & empstat < 20) & age >= 18, 1, 0),
+         single_parent = if_else(marst == 6 & u18 == 1, 1, 0), #marst = 6: never married/single
+         married_parent = if_else((marst == 1 | marst == 2) & u18 == 1, 1, 0), #marst = 1: married, spouse present; 2: married, spouse absent
+         other_parent = if_else((marst >= 3 & marst <= 5 | marst == 7) & u18 == 1, 1, 0), #3: separated; 4: Divorced; 5: Widowed; 7: Widowed or Divorced
+         ## labor force variable creation
+         uhrsworkly = if_else(uhrsworkly == 999, 0, uhrsworkly), # uhrsworkly = usual hours worked per week last year
          # designating full time and part time status
          ft = if_else(uhrsworkly >= 35, 1, 0),
          pt = if_else(uhrsworkly < 35 & uhrsworkly > 0, 1, 0),
          # earner indicator variables
          annhrs = uhrsworkly * wkswork1,
-         earner = if_else(annhrs != 0 & incwage != 0 & age >= 18 & (classwkr != 0 & classwkr != 29 & classwkr != 99 & classwkr != 13), 1, 0),
-         # renaming weights
+         earner = if_else(annhrs != 0 & incwage != 0 & age >= 16 & (classwly != 0 & classwly != 29 & classwly != 99 & classwly != 13), 1, 0),
+         nonearner_adult = if_else(annhrs == 0 & incwage == 0 & age >= 18, 1, 0),
+         # renaming 
          relate = case_when(relate == 202 | relate == 203 ~ 201,
                             relate == 1116 | relate == 1117 ~ 1114,
                             TRUE ~ relate),
