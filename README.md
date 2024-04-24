@@ -1,16 +1,14 @@
 # RWJF Summary Report
 
-## Definitions
-Low-income: less than 200% of FPL
-Family: Census Bureau definition
-Race and ethnicity are mutually exclusive
+This repository hosts the data and R scripts for any output related to the RWJF Low-income families of color projects. The repository is organized based on data source (CPS, ACS, etc.). 
 
-## Labor market outcomes
-This folder contains r scripts for tables related to labor market outcomes for low income families along with income and poverty metrics for families. 
-**Note** Please refer to r scripts `functionsMarch.R` and `March CPS labor outcomes.R`and *ignore* the rest as the other files are previous, incomplete iterations of the portion of the project.
+## CPS data
+This folder contains r scripts for tables on demographics and labor market outcomes for low income families laong with income and poverty metrics for low income families. 
 
-### Data source
-CPS March data
+
+## ACS data
+This folder contains r scripts for two components: 1) a replication of key demographic statistics above but using ACS data to account for sample sizing issues for AIAN and AAPI groups, and 2) housing. The r scripts are organized by the topic of their output. The housing folder contains r scripts for tables related to housing, housing cost burden, and homeownership, along with some transportation (transit time incl) related code. 
+
 
 
 ## Assets and debt
@@ -20,10 +18,4 @@ This folder contains code for tables related to assets and debt including saving
 
 ### Data source
 SCF Data
-
-## Housing
-This folder contains r scripts for tables related to housing, housing cost burden, and homeownership, along with some transportation (transit time incl) related code as well. 
-
-### Data source
-ACS data
 
