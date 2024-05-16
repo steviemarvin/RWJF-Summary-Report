@@ -1,3 +1,29 @@
+## ASC Data
+library(ipumsr)
+library(here)
+library(tidyverse)
+library(epiextractr)
+library(stats)
+library(epidatatools) # summarize_groups
+library(data.table)
+library(readxl)
+library(haven)
+library(janitor)
+library(xlsx)
+library(openxlsx)
+library(realtalk) #cpi_u_rs_annual
+library(fastDummies) # create indicator variables 
+
+
+## load data here
+ddi <-  read_ipums_ddi(here("data/usa_00016.xml"))
+acs_raw <- read_ipums_micro(ddi, verbose = FALSE)
+names(acs_raw) <- tolower(names(acs_raw))
+
+source(here("code/01_acs_cleaning.R"), echo = TRUE)
+source(here("code/02_acs_universe.R"), echo = TRUE)
+
+
 # sample size stuff
 acs_demo <- acs_clean %>% 
   filter(u18 == 1 & (poverty < 200 & poverty != 0)) %>% 
@@ -128,23 +154,43 @@ acs_parents_age <- acs_demo_2022 %>%
 
 # disability in household
 acs_disability <- acs_demo_2022 %>% 
-  mutate(across(contains("diff"), ~ case_when(.x == 0 ~ NA,
-                                              .x == 1 ~ 0,
-                                              .x == 2 ~ 1))) %>% 
-  select(year, serial, cbserial, age, contains("diff"))
-         
-    diffany = case_when(diffrem == 2 | diffphys == 2 | diffmob == 2 | 
-                               diffcare == 2 | diffsens == 2 | diffeye == 2 |
-                               diffhear == 2 ~ 1,
-                             diffrem == 1 | diffphys == 1 | diffmob == 1 | 
-                               diffcare == 1 | diffsens == 1 | diffeye == 1 |
-                               diffhear == 1 ~ 0,
-                             is.na(diffrem) | is.na(diffphys) | is.na(diffmob) |
-                               is.na(diffcare) | is.na(diffsens) | is.na(diffeye) | 
-                               is.na(diffhear) ~ NA),
-         diff_parent = if_else(diffany == 1 & u18 == 1 & (relate == 101 | relate == 201 | relate == 1114), 1, 0),
-         diff_other_adult = if_else(diffany == 1 & (relate != 101 & relate != 201 & relate != 1114), 1, 0),
-         diff_child = if_else(diffany == 1 & age < 18, 1, 0)) 
+  mutate(across(contains("diff"), ~case_when(.x == 0 ~ NA,
+                                             .x == 1 ~ 0,
+                                             .x == 2 ~ 1)),
+         diffany_adult = case_when((diffrem == 1 | diffphys == 1 | diffmob == 1 |
+                                     diffcare == 1 | diffsens == 1 | diffeye == 1 |
+                                     diffhear == 1) ~ 1,
+                                   (diffrem == 0 & diffphys == 0 & diffmob == 0 &
+                                     diffcare == 0 & diffsens == 0 & diffeye == 0 & 
+                                     diffhear == 0) ~ 0,
+                                   TRUE ~ NA),
+         diffany_child = case_when((diffrem == 1 | diffphys == 1 | diffmob == 1 |
+                                     diffcare == 1 | diffsens == 1 | diffeye == 1 |
+                                     diffhear == 1) & age < 18 ~ 1,
+                                   ((diffrem == 0 | is.na(diffrem)) & (diffphys == 0 | is.na(diffphys)) & (diffmob == 0 | is.na(diffmob)) &
+                                     (diffcare == 0 | is.na(diffcare)) & diffsens == 0 & diffeye == 0 & 
+                                     diffhear == 0) & age < 18 ~ 0,
+                                   TRUE ~ NA),
+         diff_hh = case_when(diffany_adult == 1 & related == 101 ~ 1,
+                             diffany_adult == 0 & related == 101 ~ 0,
+                             TRUE ~ NA),
+         diff_parent = case_when(diffany_adult == 1 & (related == 101 | related == 201 | related == 1114) ~ 1,
+                                 diffany_adult == 0 & (related == 101 | related == 201 | related == 1114) ~ 0,
+                                 TRUE ~ NA),
+         diff_child = case_when(diffany_child == 1 ~ 1,
+                                diffany_child == 0 ~ 0,
+                                TRUE ~ NA),
+         diff_hhmember = case_when(diffany_adult == 1 & (related != 101 & related != 201 & related != 1114) & age >= 18 ~ 1,
+                                   diffany_adult == 0 & (related != 101 & related != 201 & related != 1114) & age >= 18 ~ 0,
+                                   TRUE ~ -1)) %>% 
+  group_by(serial) %>% 
+  summarize(across(diff_hh | diff_parent | diff_child | diff_hhmember, ~max(.x, na.rm = TRUE)),
+            hhwgt = max(hhwgt)) %>% 
+  mutate(diff_hhmember = if_else(diff_hhmember == -1, NA, diff_hhmember)) %>% 
+  left_join(acs_hh_head_wbhaa, by = "serial") %>% 
+  group_by(wbhaa_hh) %>% 
+  summarize(across(contains("diff"), ~weighted.mean(.x, w = hhwgt, na.rm = TRUE), .names = "share_{.col}"))
+
 
 # intergenerational households
 acs_intergen_hh <- acs_demo_2022 %>% 
@@ -170,4 +216,22 @@ acs_intergenXwbhaa_hh <- acs_intergen_hh %>%
   group_by(wbhaa) %>% 
   summarize(n = n(),
             w = sum(hhwt))
+
+acs_foster_hh <- acs_demo_2022 %>% 
+  mutate(foster_child = if_else(related == 1242 & age < 18, 1, 0)) %>% 
+  group_by(serial) %>% 
+  summarize(foster_child = max(foster_child),
+            hhwgt = max(hhwgt)) %>%
+  left_join(acs_hh_head_wbhaa, by = "serial") %>% 
+  group_by(wbhaa_hh) %>% 
+  summarize(share_foster = weighted.mean(foster_child, w = hhwgt), 
+            sum_foster = sum(foster_child))
+  
+  foster_hh <- demo_2022 %>% 
+  filter(relate == 1242 & age < 18) %>% 
+  group_by(year) %>% distinct(serial, .keep_all = FALSE) %>% 
+  left_join(demo_2022, by = c("year", "serial"), multiple = "all") %>% 
+  filter(relate == 101 & lowincome == 1) %>% select(year, serial) %>% 
+  left_join(demo_2022, by = c("year", "serial"), multiple = "all")
+
 

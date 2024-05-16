@@ -1,30 +1,8 @@
 ## master 
-## ASC Data
-library(ipumsr)
-library(here)
-library(tidyverse)
-library(epiextractr)
-library(stats)
-library(epidatatools) # summarize_groups
-library(data.table)
-library(readxl)
-library(haven)
-library(janitor)
-library(xlsx)
-library(openxlsx)
-library(realtalk) #cpi_u_rs_annual
-library(fastDummies) # create indicator variables 
-
-
-## load data here
-ddi <-  read_ipums_ddi(here("data/usa_00016.xml"))
-acs_raw <- read_ipums_micro(ddi, verbose = FALSE)
-names(acs_raw) <- tolower(names(acs_raw))
-
 # cleaning up acs data
 acs_clean <- acs_raw %>% 
   mutate(# variable that indicates that respondent is either household head or spouse
-         hh_head_sp = if_else(related == 101 | relate == 201, 1, 0),
+         hh_head_sp = if_else(related == 101 | related == 201, 1, 0),
          # indicator variables for whether or not repondent has a child under 18 or under 6
          u18 = if_else(yngch < 18 | eldch < 18, 1, 0),
          u6 = if_else(yngch < 6 | eldch < 6, 1, 0),
@@ -45,7 +23,7 @@ acs_clean <- acs_raw %>%
          # indicator variables of type of parent
          single_parent = if_else(marst == 6 & u18 == 1, 1, 0), #marst = 6: never married/single
          married_parent = if_else((marst == 1 | marst == 2) & u18 == 1, 1, 0),  #marst = 1: married, spouse present; 2: married, spouse absent
-         across(sex | wbhaa, ~as.character(as_factor(.x)))) %>% 
+         across(sex | wbhaa, ~as.character(as_factor(.x)))) 
   # creating indicator variables for each race/ethnicity for summarizing families as a whole down the line
   dummy_cols(select_columns = 'wbhaa', ignore_na = TRUE)
 

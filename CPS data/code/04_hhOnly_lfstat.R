@@ -5,7 +5,7 @@
 # df that has all household members
 hhOnly_df <- asec_clean %>% 
   # keeping households where only the hh head has a child under 18
-  right_join(filter(li_families, hh_type == "hhOnly"), by = c("year", "serial")) %>% 
+  right_join(filter(li_families, hh_type == "hhOnly" | hh_type == "hhXr" | hh_type == "hhXnr" | hh_type == "hhXnrXr"), by = c("year", "serial")) %>% 
   # joining indicator variable to indicate that an unmarried partner is present in the household
   left_join(partner_present, by = c("year", "serial")) %>% 
   # filtering out unrelated adults in the household and foster children (different legal status)
@@ -137,7 +137,7 @@ all_adults <- hhOnly_df %>%
 # getting unweighted and weightedsample pop for families by race and marital status
 uw_pop <- all_adults %>% 
   group_by(year) %>% 
-  summarize_groups(wbhaa_white | wbhaa_black | wbhha_hispanic | wbhaa_AIAN | wbhaa_AAPI,
+  summarize_groups(wbhaa_white | wbhaa_black | wbhaa_hispanic | wbhaa_AIAN | wbhaa_AAPI,
                    mp = sum(married_parent_hh),
                    nmp = sum(not_married_parent_hh),
                    w_mp = round(sum(married_parent_hh * asecwth), 0),
@@ -148,7 +148,7 @@ uw_pop <- all_adults %>%
 
 share_sp <- all_adults %>% 
   group_by(year) %>% 
-  summarize_groups(wbhaa_white | wbhaa_black | wbhha_hispanic | wbhaa_AIAN | wbhaa_AAPI,
+  summarize_groups(wbhaa_white | wbhaa_black | wbhaa_hispanic | wbhaa_AIAN | wbhaa_AAPI,
                    sp = sum(single_parent_hh),
                    nmp = sum(not_married_parent_hh),
                    w_sp = round(sum(single_parent_hh * asecwth), 0),
@@ -339,3 +339,12 @@ share_lowincome <- filter(families_hh_type, hh_type == "hhOnly") %>%
   summarize(share_lowincome = round(weighted.mean(lowincome, w = asecwth, na.rm = TRUE), 4)) %>% 
   pivot_wider(id_cols = year, names_from = wbhaa, values_from = share_lowincome)
 
+
+sample_size <- hhOnly_df %>% 
+  filter(relate == 101, pov50 == 1) %>% 
+  group_by(year, wbhaa) %>% 
+  summarize(n = n()) %>% ungroup() %>% 
+  filter(!is.na(wbhaa)) %>% 
+  pivot_wider(id_cols = year, names_from = wbhaa, values_from = "n")
+  
+  

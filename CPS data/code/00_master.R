@@ -1,5 +1,5 @@
 ## master 
-## CPS ASEC DATA 
+## CPS ASEC DATA pulls
 library(ipumsr)
 library(here)
 library(tidyverse)
@@ -14,7 +14,6 @@ library(xlsx)
 library(openxlsx)
 library(realtalk) #cpi_u_rs_annual
 library(fastDummies) # create indicator variables 
-
 
 ## load data here
 ddi <-  read_ipums_ddi(here("data/cps_00016.xml"))
