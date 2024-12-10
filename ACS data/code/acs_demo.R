@@ -80,7 +80,6 @@ acs_demo_2022 <- mutate(acs_demo_2022,
                         childu6 = if_else(age < 6, 1, 0))
 
 acs_li_hh_child <- acs_demo_2022 %>% 
-  inner_join(acs_li_families, by = c("year", "serial")) %>% 
   group_by(serial) %>% 
   summarize(across(childu18 | childu6, ~ sum(.x)),
             hhwgt = max(hhwt)) %>% ungroup() %>% 
@@ -97,7 +96,6 @@ acs_li_hh_child <- acs_demo_2022 %>%
   summarize(across(contains("num_childu18_") | contains("num_childu6_"), ~round(sum(.x * hhwgt), 0)))
 
 acs_li_hh_childXwbhaa <- acs_demo_2022 %>% 
-  inner_join(acs_li_families, by = c("year", "serial")) %>% 
   group_by(serial) %>% 
   summarize(across(childu18 | childu6, ~ sum(.x)),
             hhwgt = max(hhwt)) %>% ungroup() %>% 
@@ -152,6 +150,20 @@ acs_parents_age <- acs_demo_2022 %>%
             median = median(age)) %>% 
   pivot_wider(id_cols = wbhaa, names_from = sex, values_from = c("mean", "median"))
 
+acs_parents_genderXwbhaa <- acs_demo_2022 %>% 
+  filter(u18 == 1 & related == 101) %>% 
+  group_by(wbhaa, sex) %>%
+  summarize(sum = sum(perwt)) %>% 
+  pivot_wider(id_cols = wbhaa, names_from = sex, values_from = c("sum")) %>% 
+  mutate(sum = rowSums(across(where(is.numeric)), na.rm=TRUE),
+         across(Female | Male, ~round(.x/sum, 3))) %>% 
+  filter(!is.na(wbhaa))
+
+acs_parents_gender <- acs_demo_2022 %>% 
+  filter(u18 == 1 & related == 101) %>% 
+  group_by(sex) %>% 
+  summarize(sum = sum(perwt)) 
+
 # disability in household
 acs_disability <- acs_demo_2022 %>% 
   mutate(across(contains("diff"), ~case_when(.x == 0 ~ NA,
@@ -182,9 +194,12 @@ acs_disability <- acs_demo_2022 %>%
                                 TRUE ~ NA),
          diff_hhmember = case_when(diffany_adult == 1 & (related != 101 & related != 201 & related != 1114) & age >= 18 ~ 1,
                                    diffany_adult == 0 & (related != 101 & related != 201 & related != 1114) & age >= 18 ~ 0,
-                                   TRUE ~ -1)) %>% 
+                                   TRUE ~ -1),
+         diff_childorparent = case_when(diff_parent == 1 ~ 1,
+                                        diff_child == 1 ~ 1,
+                                        TRUE ~ 0)) %>% 
   group_by(serial) %>% 
-  summarize(across(diff_hh | diff_parent | diff_child | diff_hhmember, ~max(.x, na.rm = TRUE)),
+  summarize(across(diff_hh | diff_parent | diff_child | diff_hhmember | diff_childorparent, ~max(.x, na.rm = TRUE)),
             hhwgt = max(hhwgt)) %>% 
   mutate(diff_hhmember = if_else(diff_hhmember == -1, NA, diff_hhmember)) %>% 
   left_join(acs_hh_head_wbhaa, by = "serial") %>% 
@@ -204,7 +219,7 @@ acs_intergen_hh <- acs_demo_2022 %>%
   rename_with(~gsub(" ", "_", .), everything()) %>% 
   rename_with(~gsub("-", "_", .), everything()) %>% 
   # indicator variable for intergenerational households
-  mutate(intergenerational = case_when(!is.na(parent) & !is.na(head_householder) & !is.na(child) ~ 1,
+  mutate(intergenerational = case_when((!is.na(parent) | !is.na(parent_in_law)) & !is.na(head_householder) & !is.na(child) ~ 1,
                                        !is.na(head_householder) & !is.na(child) & !is.na(grandchild) ~ 1,
                                        TRUE ~ 0))
 
